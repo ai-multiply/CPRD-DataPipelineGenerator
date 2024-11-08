@@ -1,0 +1,58 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp {{ grid_engine.cpus }}
+#$ -l h_rt={{ grid_engine.runtime }}
+#$ -l h_vmem={{ grid_engine.memory }}
+
+module load parallel
+
+echo "Beginning date conversion" $(date)
+
+{% for table_name, table in tables.items() %}
+{% if table.date_columns %}
+# Define awk script for {{ table_name }}
+read -r -d '' awk_{{ table_name }} << 'EOF'
+BEGIN { FS=OFS="\t"; RS="\r?\n" }
+{
+    {% for date_col in table.date_columns %}
+    if (${{ table_columns[table_name][date_col] }}) {
+        split(${{ table_columns[table_name][date_col] }}, d{{ loop.index }}, "/")
+        ${{ table_columns[table_name][date_col] }} = d{{ loop.index }}[3] "-" d{{ loop.index }}[2] "-" d{{ loop.index }}[1]
+    }
+    {% endfor %}
+    print $0
+}
+EOF
+
+echo "Converting dates for {{ table_name }}" $(date)
+cd "{{ processed_data_folder }}/{{ table_name }}"
+
+
+# Save header and process rest of file separately
+head -n 1 s01_{{ table_name }}.txt > dates_{{ table_name }}.txt
+tail -n +2 s01_{{ table_name }}.txt > tmp_{{ table_name }}.txt
+parallel --pipepart -a tmp_{{ table_name }}.txt "awk '$awk_{{ table_name }}'" >> dates_{{ table_name }}.txt
+rm tmp_{{ table_name }}.txt
+
+{% if table_name == "patient" %}
+# Special handling for patient table - add computed full DOB
+head -n 1 dates_{{ table_name }}.txt | awk 'BEGIN {RS="\r?\n"; FS=OFS="\t"} {print $0, "dob"}' > s02_{{ table_name }}.txt
+tail -n +2 dates_{{ table_name }}.txt | awk 'BEGIN {RS="\r?\n"; FS=OFS="\t"} 
+{ 
+    yob=${{ table_columns[table_name]["yob"] }}
+    if (yob != "") {
+        print $0, yob "-01-01"
+    } else {
+        print $0, ""
+    }
+}' >> s02_{{ table_name }}.txt
+rm dates_{{ table_name }}.txt
+{% else %}
+mv dates_{{ table_name }}.txt s02_{{ table_name }}.txt
+{% endif %}
+
+{% endif %}
+{% endfor %}
+
+echo "Date conversion complete" $(date)

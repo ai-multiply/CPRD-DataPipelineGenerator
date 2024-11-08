@@ -1,0 +1,40 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp {{ grid_engine.cpus }}
+#$ -l h_rt={{ grid_engine.runtime }}
+#$ -l h_vmem={{ grid_engine.memory }}
+
+echo "Starting data concatenation" $(date)
+
+# Create output directory structure
+mkdir -p {{ processed_data_folder }}
+cd {{ processed_data_folder }}
+
+{% for table_name, table in tables.items() %}
+mkdir -p {{ table_name }}
+{% endfor %}
+
+# Copy and concatenate files
+{% for table_name, table in tables.items() %}
+echo "Processing {{ table_name }} files" $(date)
+cd {{ processed_data_folder }}/{{ table_name }}
+rm -f s01_{{ table_name }}.txt
+touch s01_{{ table_name }}.txt
+
+{% if table_files[table_name] %}
+# Get header from first file
+head -n 1 "{{ table_files[table_name][0] }}" > s01_{{ table_name }}.txt
+
+# Concatenate all files
+{% for file in table_files[table_name] %}
+tail -n +2 "{{ file }}" >> s01_{{ table_name }}.txt
+{% endfor %}
+{% else %}
+echo "Warning: No files found for {{ table_name }}"
+{% endif %}
+
+echo "Finished {{ table_name }}" $(date)
+{% endfor %}
+
+echo "Concatenation complete" $(date)
