@@ -457,25 +457,26 @@ generating scripts and running jobs. Available steps are:</p>
 <p>For each step: 1. Generate the step script 2. Submit and wait for the
 job to complete 3. Verify successful completion 4. Proceed to generating
 the next step</p>
-<p>Editing submit.sh The submit.sh script contains a line like this:</p>
-<pre class="bash"><code>python new_run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables</code></pre>
+<p><strong>Editing submit.sh</strong></p>
+<p>the submit.sh script contains a line like this:</p>
+<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables</code></pre>
 <p>For each step, modify the -s parameter to specify the correct step
 code:</p>
 <ol style="list-style-type: decimal">
 <li>For concatenation:</li>
 </ol>
-<pre class="bash"><code>python new_run.py -c new.yaml -o $PWD/generated_scripts -s concatenate</code></pre>
+<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s concatenate</code></pre>
 <ol start="2" style="list-style-type: decimal">
 <li>For date conversion:</li>
 </ol>
-<pre class="bash"><code>python new_run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates</code></pre>
+<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates</code></pre>
 <p>And so on for each step in the sequence.</p>
 </div>
 <div id="important-rules" class="section level3">
 <h3>Important Rules</h3>
 <ol style="list-style-type: decimal">
 <li>Never generate multiple steps at once</li>
-<li>Never run multiple jobs simultaneously</li>
+<li>Never run multiple jobs simultaneously from different steps</li>
 <li>Always verify job completion before generating the next step</li>
 <li>Use specific step codes when generating scripts (e.g.,
 <code>apply_lookups</code>, not <code>s03</code>)</li>
@@ -506,9 +507,9 @@ completed successfully:</p>
 <div id="common-issues" class="section level3">
 <h3>Common issues</h3>
 <ul>
-<li>Ensure that the disk space is enough. Each step will duplicate data.
-If you are happy with the output, you can delete file from previous
-steps.</li>
+<li>Ensure that there is enough disk space (at least double the current
+size). Each step will duplicate data. If you are happy with the output,
+you can delete the file(s) from previous steps.</li>
 </ul>
 </div>
 </div>
