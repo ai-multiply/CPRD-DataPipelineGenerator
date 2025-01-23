@@ -42,14 +42,9 @@ class CodelistGenerator(BaseGenerator):
             raise InputValidationError("Codelists configuration must be a dictionary")
 
         for codelist_id, codelist_config in codelists.items():
-            required_fields = ['original', 'user']
-            missing = [
-                field for field in required_fields 
-                if field not in codelist_config
-            ]
-            if missing:
+            if 'original' not in codelist_config:
                 raise InputValidationError(
-                    f"Codelist '{codelist_id}' missing required fields: {missing}"
+                    f"Codelist '{codelist_id}' missing required field: original"
                 )
 
     def validate_codelist_files(
@@ -94,7 +89,7 @@ class CodelistGenerator(BaseGenerator):
                 )
             
             # User codelist is optional but if specified must exist
-            if config['user']:
+            if config.get('user'):
                 user_path = os.path.join(codelists_folder, config['user'])
                 if not os.path.isfile(user_path):
                     missing_files.append(

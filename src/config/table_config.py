@@ -6,6 +6,7 @@ class TableConfig:
     name: str
     subfolder_pattern: str
     file_pattern: str
+    file_path: Optional[str]
     date_columns: List[str]
     lookup_columns: Dict[str, str]  # column_name: lookup_file
     codelist_annotations: Dict[str, str]  # column_name: codelist_name
@@ -16,8 +17,9 @@ class TableConfig:
         """Create TableConfig from dict."""
         return cls(
             name=name,
-            subfolder_pattern=config['subfolder_pattern'],
-            file_pattern=config['file_pattern'],
+            subfolder_pattern=config.get('subfolder_pattern', ''),
+            file_pattern=config.get('file_pattern', ''),
+            file_path=config.get('file_path'),
             date_columns=config.get('date_columns', []),
             lookup_columns=config.get('lookup_columns', {}),
             codelist_annotations=config.get('codelist_annotations', {}),

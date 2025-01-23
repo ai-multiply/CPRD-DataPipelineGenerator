@@ -13,22 +13,22 @@ mkdir -p {{ script_output_dir }}/lists
 {% for codelist_id, codelist in codelists.items() %}
 echo "Processing {{ codelist_id }} codelist" $(date)
 
+{% if codelist.user %}
 # Combine files, giving precedence to user entries if they exist
-if [[ -f "{{ codelists_folder }}/{{ codelist.user }}" ]]; then
-    awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"} 
-        FNR==NR{term[$1]=$2; count[$1]=$3; next} 
-        NR>1{if (term[$1]) print $1, term[$1], count[$1]; 
-             else print $1, $2, 0}' \
-        "{{ codelists_folder }}/{{ codelist.user }}" \
-        "{{ codelists_folder }}/{{ codelist.original }}" \
-        | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
-else
-    # Just process original file if no user file exists
-    awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"}
-        NR>1{print $1, $2, 0}' \
-        "{{ codelists_folder }}/{{ codelist.original }}" \
-        | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
-fi
+awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"} 
+    FNR==NR{term[$1]=$2; count[$1]=$3; next} 
+    NR>1{if (term[$1]) print $1, term[$1], count[$1]; 
+         else print $1, $2, 0}' \
+    "{{ codelists_folder }}/{{ codelist.user }}" \
+    "{{ codelists_folder }}/{{ codelist.original }}" \
+    | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+{% else %}
+# Process original file only
+awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"}
+    NR>1{print $1, $2, 0}' \
+    "{{ codelists_folder }}/{{ codelist.original }}" \
+    | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+{% endif %}
 
 echo "Finished {{ codelist_id }} codelist" $(date)
 {% endfor %}

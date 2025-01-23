@@ -78,5 +78,4 @@ class PipelineGenerator:
                 self.logger.info(f"Generated script: {filepath}")
                 
             except Exception as e:
-                self.logger.error(f"Error generating script for {step}: {str(e)}")
                 raise
