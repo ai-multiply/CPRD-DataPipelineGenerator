@@ -13,21 +13,109 @@ mkdir -p {{ script_output_dir }}/lists
 {% for codelist_id, codelist in codelists.items() %}
 echo "Processing {{ codelist_id }} codelist" $(date)
 
-{% if codelist.user %}
-# Combine files, giving precedence to user entries if they exist
+{% if codelist.get_type() == 'original_only' %}
+# Case 1: Original codelist only - rename description column with prefix
+awk -v prefix="{{ codelist_id }}" 'BEGIN{RS="\r?\n"; FS=OFS="\t"} 
+    NR==1 {
+        # Add prefix to description column name
+        print $1, prefix "_" $2
+    }
+    NR>1 {
+        print $1, $2
+    }' \
+    "{{ codelists_folder }}/{{ codelist.original }}" \
+    > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+
+{% elif codelist.get_type() == 'user_only' %}
+# Case 2: User codelist only - prepend names and add flag
+awk -v prefix="{{ codelist_id }}" 'BEGIN{RS="\r?\n"; FS=OFS="\t"} 
+    NR==1 {
+        # Get number of columns
+        cols = NF
+        # Add prefix to column names and flag
+        if (cols == 2) {
+            print $1, prefix "_" $2, prefix "_flag"
+        } else {
+            print $1, prefix "_" $2, prefix "_count", prefix "_flag"
+        }
+    }
+    NR>1 {
+        # Add flag=1 to all entries
+        if (NF == 2) {
+            print $1, $2, "1"
+        } else {
+            print $1, $2, $3, "1"
+        }
+    }' \
+    "{{ codelists_folder }}/{{ codelist.user }}" \
+    > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+
+{% else %}
+# Case 3: Combined original and user codelists
+# First process user codelist to get existing codes
 awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"} 
-    FNR==NR{term[$1]=$2; count[$1]=$3; next} 
-    NR>1{if (term[$1]) print $1, term[$1], count[$1]; 
-         else print $1, $2, 0}' \
+    NR>1 {
+        codes[$1] = 1
+        if (NF == 3) {
+            counts[$1] = $3
+        } else {
+            counts[$1] = ""
+        }
+        desc[$1] = $2
+    }
+    END {
+        # Store codes for processing
+        for (code in codes) {
+            print code
+        }
+    }' \
+    "{{ codelists_folder }}/{{ codelist.user }}" \
+    > "{{ script_output_dir }}/lists/{{ codelist_id }}_codes.tmp"
+
+# Combine files with appropriate flags and column names
+awk -v prefix="{{ codelist_id }}" '
+    BEGIN {
+        RS="\r?\n"
+        FS=OFS="\t"
+        # Read user codes first
+        while ((getline < "{{ script_output_dir }}/lists/{{ codelist_id }}_codes.tmp") > 0) {
+            user_codes[$1] = 1
+        }
+    }
+    FILENAME == "{{ codelists_folder }}/{{ codelist.user }}" && NR==1 {
+        cols = NF
+        if (cols == 2) {
+            has_count = 0
+            print "code", prefix "_desc", prefix "_flag"
+        } else {
+            has_count = 1
+            print "code", prefix "_desc", prefix "_count", prefix "_flag"
+        }
+        next
+    }
+    FILENAME == "{{ codelists_folder }}/{{ codelist.user }}" && NR>1 {
+        if (has_count) {
+            print $1, $2, $3, "1"
+        } else {
+            print $1, $2, "1"
+        }
+    }
+    FILENAME == "{{ codelists_folder }}/{{ codelist.original }}" && NR>1 {
+        if (!($1 in user_codes)) {
+            if (has_count) {
+                print $1, $2, "0", "0"
+            } else {
+                print $1, $2, "0"
+            }
+        }
+    }' \
     "{{ codelists_folder }}/{{ codelist.user }}" \
     "{{ codelists_folder }}/{{ codelist.original }}" \
-    | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
-{% else %}
-# Process original file only
-awk 'BEGIN{RS="\r?\n"; FS=OFS="\t"}
-    NR>1{print $1, $2, 0}' \
-    "{{ codelists_folder }}/{{ codelist.original }}" \
-    | sort -V -t $'\t' -k1,1 > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+    | sort -V -t $'\t' -k1,1 \
+    > "{{ script_output_dir }}/lists/{{ codelist_id }}_terms.txt"
+
+# Clean up temporary files
+rm -f "{{ script_output_dir }}/lists/{{ codelist_id }}_codes.tmp"
 {% endif %}
 
 echo "Finished {{ codelist_id }} codelist" $(date)

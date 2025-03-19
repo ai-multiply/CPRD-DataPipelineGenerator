@@ -14,30 +14,37 @@ echo "Beginning lookup conversion" $(date)
 echo "Processing {{ table_name }} lookups" $(date)
 cd "{{ processed_data_folder }}/{{ table_name }}"
 
-
-head -n 1 s02_{{ table_name }}.txt > s03_{{ table_name }}.txt
-
+# First define all our awk programs using heredocs
+# Each program will handle one type of lookup transformation
 {% for col_name, lookup_file in table.lookup_columns.items() %}
-{% if loop.first %}
-# First lookup for {{ table_name }}
-tail -n +2 s02_{{ table_name }}.txt | awk -v RS='\r?\n' 'BEGIN{FS=OFS="\t"} \
-FNR==NR{map[$1]=$2;next} \
-{${{ col_positions[table_name][col_name] }}=map[${{ col_positions[table_name][col_name] }}]} \
-1' "{{ lookups_folder }}/{{ lookup_file }}" - > tmp1_{{ table_name }}.txt
-{% else %}
-# Additional lookup for {{ table_name }}
-tail -n +2 tmp{{ loop.index0 }}_{{ table_name }}.txt | awk -v RS='\r?\n' 'BEGIN{FS=OFS="\t"} \
-FNR==NR{map[$1]=$2;next} \
-{${{ col_positions[table_name][col_name] }}=map[${{ col_positions[table_name][col_name] }}]} \
-1' "{{ lookups_folder }}/{{ lookup_file }}" - > tmp{{ loop.index }}_{{ table_name }}.txt
-{% endif %}
+read -r -d '' awk_{{ col_name }} << 'AWKEND'
+BEGIN { FS=OFS="\t";RS="\r?\n" }
+FNR==NR {
+    map[$1]=$2
+    next
+}
+{
+    if (${{ col_positions[table_name][col_name] }} in map) {
+        ${{ col_positions[table_name][col_name] }} = map[${{ col_positions[table_name][col_name] }}]
+    }
+    print $0
+}
+AWKEND
 {% endfor %}
 
-{% if table.lookup_columns|length > 0 %}
-cat tmp{{ table.lookup_columns|length }}_{{ table_name }}.txt >> s03_{{ table_name }}.txt
-rm -f tmp*_{{ table_name }}.txt
-{% endif %}
+# Save the header first
+head -n 1 {{ table_input_files[table_name] }} > s03_{{ table_name }}.txt
 
+# Create data file without header for parallel processing
+tail -n +2 {{ table_input_files[table_name] }} > tmp_{{ table_name }}.txt
+
+# Process the data file in parallel through our lookup chain
+parallel --pipepart -a tmp_{{ table_name }}.txt "awk '$awk_{{ table.lookup_columns.keys()|list|first }}' '{{ lookups_folder }}/{{ table.lookup_columns.values()|list|first }}' - {% for col_name, lookup_file in table.lookup_columns.items() %}{% if not loop.first %} | awk '$awk_{{ col_name }}' '{{ lookups_folder }}/{{ lookup_file }}' -{% endif %}{% endfor %}" >> s03_{{ table_name }}.txt
+
+# Clean up our temporary file
+rm tmp_{{ table_name }}.txt
+
+echo "Finished {{ table_name }}" $(date)
 {% endif %}
 {% endfor %}
 
