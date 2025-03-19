@@ -16,6 +16,7 @@ class TableConfig:
         """Create TableConfig from dict."""
         return cls(
             name=name,
+            subfolder_pattern=config['subfolder_pattern'],
             file_pattern=config['file_pattern'],
             date_columns=config.get('date_columns', []),
             lookup_columns=config.get('lookup_columns', {}),
