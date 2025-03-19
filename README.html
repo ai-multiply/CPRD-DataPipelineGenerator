@@ -352,17 +352,43 @@ display: none;
 </div>
 
 
-<div id="cprd-data-processing-pipeline" class="section level1">
-<h1>CPRD Data Processing Pipeline</h1>
-<p>A pipeline for processing and standardizing Clinical Practice
-Research Datalink (CPRD) data, designed for high-performance computing
-environments with Grid Engine.</p>
+<div id="cprd-data-processing-pipeline-generator" class="section level1">
+<h1>CPRD Data Processing Pipeline Generator</h1>
+<p>A pipeline generator for processing and standardising Clinical
+Practice Research Datalink (CPRD) data, developed by the <strong>AI
+MULTIPLY</strong> consortium for high-performance computing environments
+with Grid Engine. The resulting pipeline concatenates raw CPRD files,
+standardizes date formats, applies lookup tables for code-to-term
+conversion, prepares and applies reference codelists, and finally
+creates a structured SQLite database—transforming raw CPRD extracts into
+research-ready datasets optimised for analysis. The pipeline is
+compatible with both CPRD GOLD and CPRD Aurum datasets. Whilst a
+job-based HPC system is not required, alternative multi-core setups must
+be used to speed up jobs.</p>
 <div id="overview" class="section level2">
 <h2>Overview</h2>
-<p>This pipeline processes CPRD data through several steps, with each
-step requiring: 1. Generation of the step script using Python 2.
-Submission and completion of the generated job 3. Verification of
-success before proceeding to the next step</p>
+<p>This repository contains a <strong>pipeline generator</strong> that
+creates customised data processing scripts for CPRD data. The key
+concepts are:</p>
+<ol style="list-style-type: decimal">
+<li>The Python code in this repository is not the pipeline itself, but
+rather a <strong>generator</strong> that creates the actual pipeline
+scripts</li>
+<li>The pipeline processes CPRD data through several sequential steps to
+transform raw data extracts into a standardised research database</li>
+<li><strong>Each step must complete before the next can be
+generated</strong></li>
+<li>The system validates outputs at each stage to ensure data integrity
+and consistent processing</li>
+</ol>
+</div>
+<div id="ai-multiply-consortium" class="section level2">
+<h2>AI MULTIPLY Consortium</h2>
+<p>This pipeline generator is part of the AI MULTIPLY consortium’s data
+infrastructure, designed to standardise and prepare clinical data for AI
+and machine learning applications. The pipeline maintains data
+provenance and ensures consistent processing across multiple
+datasets.</p>
 </div>
 <div id="prerequisites" class="section level2">
 <h2>Prerequisites</h2>
@@ -402,10 +428,26 @@ cd cprd-pipeline</code></pre>
 </ul></li>
 </ol>
 </div>
-<div id="pipeline-steps-and-execution" class="section level2">
-<h2>Pipeline Steps and Execution</h2>
-<p>The pipeline must be run one step at a time, alternating between
-generating scripts and running jobs. Available steps are:</p>
+<div id="pipeline-generation-and-execution-workflow" class="section level2">
+<h2>Pipeline Generation and Execution Workflow</h2>
+<div id="important-sequential-generation-requirement" class="section level3">
+<h3>⚠️ IMPORTANT: Sequential Generation Requirement ⚠️</h3>
+<p>This is a <strong>pipeline generator</strong> with a strict
+sequential workflow:</p>
+<ol style="list-style-type: decimal">
+<li>Generate a step script - verify that the Grid engine parameters as
+appropriate (i.e. increase or decrease number of cores as required)</li>
+<li>Run that step to completion</li>
+<li><strong>Only then</strong> generate the next step script</li>
+<li>Continue this pattern for all steps</li>
+</ol>
+<p>The generator analyses the output of each step to determine the
+correct configuration for the next step. <strong>Attempting to generate
+multiple steps at once will result in errors or incorrect
+processing.</strong></p>
+</div>
+<div id="available-pipeline-steps" class="section level3">
+<h3>Available Pipeline Steps</h3>
 <table>
 <colgroup>
 <col width="29%" />
@@ -452,66 +494,67 @@ generating scripts and running jobs. Available steps are:</p>
 </tr>
 </tbody>
 </table>
-<div id="step-by-step-execution" class="section level3">
-<h3>Step-by-Step Execution</h3>
-<p>For each step: 1. Generate the step script 2. Submit and wait for the
-job to complete 3. Verify successful completion 4. Proceed to generating
-the next step</p>
-<p><strong>Editing submit.sh</strong></p>
-<p>the submit.sh script contains a line like this:</p>
-<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables</code></pre>
-<p>For each step, modify the -s parameter to specify the correct step
-code:</p>
-<ol style="list-style-type: decimal">
-<li>For concatenation:</li>
-</ol>
-<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s concatenate</code></pre>
-<ol start="2" style="list-style-type: decimal">
-<li>For date conversion:</li>
-</ol>
-<pre class="bash"><code>python run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates</code></pre>
-<p>And so on for each step in the sequence.</p>
 </div>
-<div id="important-rules" class="section level3">
-<h3>Important Rules</h3>
+<div id="step-by-step-execution-workflow" class="section level3">
+<h3>Step-by-Step Execution Workflow</h3>
+<p>For each step in the pipeline:</p>
 <ol style="list-style-type: decimal">
-<li>Never generate multiple steps at once</li>
-<li>Never run multiple jobs simultaneously from different steps</li>
-<li>Always verify job completion before generating the next step</li>
-<li>Use specific step codes when generating scripts (e.g.,
-<code>apply_lookups</code>, not <code>s03</code>)</li>
+<li><p><strong>Generate the script</strong> for the current step:</p>
+<pre class="bash"><code>python run.py -c my_config.yaml -o $PWD/generated_scripts -s &lt;step_name&gt;</code></pre></li>
+<li><p><strong>Submit the job</strong> and wait for it to complete:</p>
+<pre class="bash"><code>qsub generated_scripts/s&lt;XX&gt;_&lt;step_name&gt;.sh</code></pre></li>
+<li><p><strong>Verify successful completion</strong> (check job status,
+log files, and output files)</p></li>
+<li><p><strong>Only after verification</strong>, generate the script for
+the next step</p></li>
 </ol>
+</div>
+<div id="using-submit.sh" class="section level3">
+<h3>Using submit.sh</h3>
+<p>The <code>submit.sh</code> script contains a template for generating
+scripts:</p>
+<pre class="bash"><code>python run.py -c lizzie.yaml -o $PWD/lizzie_scripts -s annotate_tables</code></pre>
+<p>Edit this file to specify: - The correct configuration file
+(<code>-c</code> parameter) - The output directory (<code>-o</code>
+parameter) - The current step to generate (<code>-s</code>
+parameter)</p>
+<p><strong>Remember</strong>: Only generate one step at a time, and only
+after the previous step has successfully completed.</p>
 </div>
 <div id="verifying-job-completion" class="section level3">
 <h3>Verifying Job Completion</h3>
-<p>Before generating the next step, always verify the previous job
+<p>Before generating the next step’s script, verify the previous job
 completed successfully:</p>
 <ol style="list-style-type: decimal">
-<li>Check job status:</li>
+<li><p>Check job status:</p>
+<pre class="bash"><code>qstat</code></pre></li>
+<li><p>Review job output:</p>
+<pre class="bash"><code>more logs/s&lt;XX&gt;_&lt;step_name&gt;.o&lt;job_id&gt;</code></pre></li>
+<li><p>Verify output files exist in the processed data directory:</p>
+<pre class="bash"><code>ls -l /path/to/processed_data/&lt;table_name&gt;/</code></pre></li>
 </ol>
-<pre class="bash"><code>qstat</code></pre>
-<ol start="2" style="list-style-type: decimal">
-<li>Review job output:</li>
-</ol>
-<pre class="bash"><code>more logs/s&lt;XX&gt;_&lt;step_name&gt;.o&lt;job_id&gt;</code></pre>
-<ol start="3" style="list-style-type: decimal">
-<li>Verify output files exist:</li>
-</ol>
-<pre class="bash"><code>cd /path/to/processed_data/</code></pre>
 </div>
 <div id="listing-available-steps" class="section level3">
 <h3>Listing Available Steps</h3>
 <p>To see all available step codes:</p>
 <pre class="bash"><code>python run.py --list-steps</code></pre>
 </div>
-<div id="common-issues" class="section level3">
-<h3>Common issues</h3>
-<ul>
-<li>Ensure that there is enough disk space (at least double the current
-size). Each step will duplicate data. If you are happy with the output,
-you can delete the file(s) from previous steps.</li>
-</ul>
 </div>
+<div id="common-issues-and-solutions" class="section level2">
+<h2>Common Issues and Solutions</h2>
+<ul>
+<li><p><strong>Disk Space</strong>: Ensure sufficient space (at least
+double the current size). Each step duplicates data. You can delete
+files from previous steps after verification.</p></li>
+<li><p><strong>Missing Dependencies</strong>: If you encounter module
+errors, ensure all requirements are installed via the conda
+environment.</p></li>
+<li><p><strong>Job Failures</strong>: Always check job logs in the logs
+directory for error messages.</p></li>
+<li><p><strong>File Path Issues</strong>: Verify all paths in your
+configuration file; expand any environment variables manually to check
+actual paths.</p></li>
+</ul>
 </div>
 </div>
 

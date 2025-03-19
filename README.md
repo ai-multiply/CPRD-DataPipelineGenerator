@@ -1,13 +1,19 @@
-# CPRD Data Processing Pipeline
+# CPRD Data Processing Pipeline Generator
 
-A pipeline for processing and standardizing Clinical Practice Research Datalink (CPRD) data, designed for high-performance computing environments with Grid Engine.
+A pipeline generator for processing and standardising Clinical Practice Research Datalink (CPRD) data, developed by the **AI MULTIPLY** consortium for high-performance computing environments with Grid Engine. The resulting pipeline concatenates raw CPRD files, standardizes date formats, applies lookup tables for code-to-term conversion, prepares and applies reference codelists, and finally creates a structured SQLite database—transforming raw CPRD extracts into research-ready datasets optimised for analysis. The pipeline is compatible with both CPRD GOLD and CPRD Aurum datasets. Whilst a job-based HPC system is not required, alternative multi-core setups must be used to speed up jobs.
 
 ## Overview
 
-This pipeline processes CPRD data through several steps, with each step requiring:
-1. Generation of the step script using Python
-2. Submission and completion of the generated job
-3. Verification of success before proceeding to the next step
+This repository contains a **pipeline generator** that creates customised data processing scripts for CPRD data. The key concepts are:
+
+1. The Python code in this repository is not the pipeline itself, but rather a **generator** that creates the actual pipeline scripts
+2. The pipeline processes CPRD data through several sequential steps to transform raw data extracts into a standardised research database
+3. **Each step must complete before the next can be generated**
+4. The system validates outputs at each stage to ensure data integrity and consistent processing
+
+## AI MULTIPLY Consortium
+
+This pipeline generator is part of the AI MULTIPLY consortium's data infrastructure, designed to standardise and prepare clinical data for AI and machine learning applications. The pipeline maintains data provenance and ensures consistent processing across multiple datasets.
 
 ## Prerequisites
 
@@ -43,9 +49,20 @@ cp example.yaml my_config.yaml
    - Table configurations
    - Codelist mappings
 
-## Pipeline Steps and Execution
+## Pipeline Generation and Execution Workflow
 
-The pipeline must be run one step at a time, alternating between generating scripts and running jobs. Available steps are:
+### ⚠️ IMPORTANT: Sequential Generation Requirement ⚠️
+
+This is a **pipeline generator** with a strict sequential workflow:
+
+1. Generate a step script - verify that the Grid engine parameters as appropriate (i.e. increase or decrease number of cores as required)
+2. Run that step to completion
+3. **Only then** generate the next step script
+4. Continue this pattern for all steps
+
+The generator analyses the output of each step to determine the correct configuration for the next step. **Attempting to generate multiple steps at once will result in errors or incorrect processing.**
+
+### Available Pipeline Steps
 
 | Step Code | Description | Script Name |
 |-----------|-------------|-------------|
@@ -56,63 +73,57 @@ The pipeline must be run one step at a time, alternating between generating scri
 | `annotate_tables` | Annotates with codelists | s05_annotate_tables.sh |
 | `create_database` | Creates SQLite database | s06_create_database.sh |
 
-### Step-by-Step Execution
+### Step-by-Step Execution Workflow
 
-For each step:
-1. Generate the step script
-2. Submit and wait for the job to complete
-3. Verify successful completion
-4. Proceed to generating the next step
+For each step in the pipeline:
 
-**Editing submit.sh**
+1. **Generate the script** for the current step:
+   ```bash
+   python run.py -c my_config.yaml -o $PWD/generated_scripts -s <step_name>
+   ```
 
-the submit.sh script contains a line like this:
+2. **Submit the job** and wait for it to complete:
+   ```bash
+   qsub generated_scripts/s<XX>_<step_name>.sh
+   ```
 
-```bash
-python run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables
-```
+3. **Verify successful completion** (check job status, log files, and output files)
 
-For each step, modify the -s parameter to specify the correct step code:
+4. **Only after verification**, generate the script for the next step
 
-1. For concatenation:
+### Using submit.sh
 
-```bash
-python run.py -c new.yaml -o $PWD/generated_scripts -s concatenate
-```
-
-2. For date conversion:
+The `submit.sh` script contains a template for generating scripts:
 
 ```bash
-python run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates
+python run.py -c lizzie.yaml -o $PWD/lizzie_scripts -s annotate_tables
 ```
 
-And so on for each step in the sequence.
+Edit this file to specify:
+- The correct configuration file (`-c` parameter)
+- The output directory (`-o` parameter)
+- The current step to generate (`-s` parameter)
 
-### Important Rules
-
-1. Never generate multiple steps at once: the pipeline generator needs to check the output of previous runs to identify columns
-2. Never run multiple jobs simultaneously from different steps: same as above
-3. Always verify job completion before generating the next step
-4. Use specific step codes when generating scripts (e.g., `apply_lookups`, not `s03`)
+**Remember**: Only generate one step at a time, and only after the previous step has successfully completed.
 
 ### Verifying Job Completion
 
-Before generating the next step, always verify the previous job completed successfully:
+Before generating the next step's script, verify the previous job completed successfully:
 
 1. Check job status:
-```bash
-qstat
-```
+   ```bash
+   qstat
+   ```
 
 2. Review job output:
-```bash
-more logs/s<XX>_<step_name>.o<job_id>
-```
+   ```bash
+   more logs/s<XX>_<step_name>.o<job_id>
+   ```
 
-3. Verify output files exist:
-```bash
-cd /path/to/processed_data/
-```
+3. Verify output files exist in the processed data directory:
+   ```bash
+   ls -l /path/to/processed_data/<table_name>/
+   ```
 
 ### Listing Available Steps
 
@@ -121,9 +132,16 @@ To see all available step codes:
 python run.py --list-steps
 ```
 
-### Common issues
+## Common Issues and Solutions
 
-* Ensure that there is enough disk space (at least double the current size). Each step will duplicate data. If you are happy with the output, you can delete the file(s) from previous steps.
+* **Disk Space**: Ensure sufficient space (at least double the current size). Each step duplicates data. You can delete files from previous steps after verification.
+
+* **Missing Dependencies**: If you encounter module errors, ensure all requirements are installed via the conda environment.
+
+* **Job Failures**: Always check job logs in the logs directory for error messages.
+
+* **File Path Issues**: Verify all paths in your configuration file; expand any environment variables manually to check actual paths.
+
 
 
 
