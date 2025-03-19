@@ -65,9 +65,12 @@ class ConcatenateGenerator(BaseGenerator):
         Raises:
             FileNotFoundError: If no files are found
         """
+        subfolder = table.subfolder_pattern if hasattr(table, 'subfolder_pattern') and table.subfolder_pattern is not None else ''
+
         pattern = os.path.join(
             raw_data_config['root_folder'],
             raw_data_config['pattern'],
+            subfolder,
             table.file_pattern
         )
         

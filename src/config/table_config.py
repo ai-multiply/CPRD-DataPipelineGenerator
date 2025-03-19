@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 @dataclass
 class TableConfig:
     name: str
+    subfolder_pattern: str
     file_pattern: str
     date_columns: List[str]
     lookup_columns: Dict[str, str]  # column_name: lookup_file
