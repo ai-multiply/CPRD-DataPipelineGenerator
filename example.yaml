@@ -1,0 +1,81 @@
+# Grid Engine global parameters
+grid_engine:
+  cpus: 4
+  memory: "16G"   # Total memory for the job
+  runtime: "1:0:0"  # HH:MM:SS
+  parallel_jobs: 8  # For GNU parallel processes
+
+# Data locations
+raw_data:
+  root_folder: "/data/IPHS-Finer-multimorbidity/CPRD-GOLD/Data/Primary Care/GOLD"
+  pattern: "21_000345_gold_patlist*Extract*"  # Pattern to match subfolders
+
+# Directory configurations
+processed_data_folder: "/data/scratch/${USER}/ImportData/temp"
+codelists_folder: "/data/IPHS-Finer-multimorbidity/CPRD-GOLD/Codelists"
+lookups_folder: "/data/IPHS-Finer-multimorbidity/CPRD-GOLD/lookups"
+database: "/data/scratch/${USER}/test_new.db"
+
+codelists:
+  ltcs:
+    original: "medcodes_terms.txt"
+    user: "QMUL_CPRD_GOLD_codelists_grouped.txt"
+
+# Table configurations
+tables:
+  clinical:
+    file_pattern: "*Clinical*.txt"
+    date_columns:
+      - eventdate
+    lookup_columns:
+      constype: "SED.txt"
+      episode: "EPI.txt"
+    codelist_annotations:
+      medcode: ltcs
+    columns:
+      patid: INTEGER
+      eventdate: TEXT
+      constype: TEXT
+      consid: INTEGER
+      medcode: INTEGER 
+      staffid: INTEGER
+      episode: TEXT
+      enttype: INTEGER
+      adid: INTEGER
+      term: TEXT
+      ltc: INTEGER
+      count: INTEGER
+    indexes:
+      - [patid]
+
+  patient:
+    file_pattern: "*Patient*.txt"
+    date_columns:
+      - crd
+      - tod
+    lookup_columns:
+      gender: "SEX.txt"
+    additional_files:
+      ethnicity: "21_000345_ethnicity_gold.txt"
+    columns:
+      patid: INTEGER
+      vmid: INTEGER
+      gender: TEXT
+      yob: INTEGER
+      mob: INTEGER
+      frd: TEXT
+      crd: TEXT
+      regstat: INTEGER
+      internal: INTEGER
+      tod: TEXT
+      toreason: INTEGER
+      dob: TEXT
+
+  # therapy:
+  #   file_pattern: "*Therapy*.txt"
+  #   date_columns:
+  #     - eventdate
+  #   codelist_columns:
+  #     prodcode: "QMUL_GOLD_PRODCODES_codelists.txt"
+  #   lookup_files:
+  #     bnf_mapping: "GOLD_prodcodes_subparas.txt"

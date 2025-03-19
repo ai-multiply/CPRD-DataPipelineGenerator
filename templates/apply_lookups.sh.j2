@@ -1,0 +1,44 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp {{ grid_engine.cpus }}
+#$ -l h_rt={{ grid_engine.runtime }}
+#$ -l h_vmem={{ grid_engine.memory }}
+
+module load parallel
+
+echo "Beginning lookup conversion" $(date)
+
+{% for table_name, table in tables.items() %}
+{% if table.lookup_columns %}
+echo "Processing {{ table_name }} lookups" $(date)
+cd "{{ processed_data_folder }}/{{ table_name }}"
+
+
+head -n 1 s02_{{ table_name }}.txt > s03_{{ table_name }}.txt
+
+{% for col_name, lookup_file in table.lookup_columns.items() %}
+{% if loop.first %}
+# First lookup for {{ table_name }}
+tail -n +2 s02_{{ table_name }}.txt | awk -v RS='\r?\n' 'BEGIN{FS=OFS="\t"} \
+FNR==NR{map[$1]=$2;next} \
+{${{ col_positions[table_name][col_name] }}=map[${{ col_positions[table_name][col_name] }}]} \
+1' "{{ lookups_folder }}/{{ lookup_file }}" - > tmp1_{{ table_name }}.txt
+{% else %}
+# Additional lookup for {{ table_name }}
+tail -n +2 tmp{{ loop.index0 }}_{{ table_name }}.txt | awk -v RS='\r?\n' 'BEGIN{FS=OFS="\t"} \
+FNR==NR{map[$1]=$2;next} \
+{${{ col_positions[table_name][col_name] }}=map[${{ col_positions[table_name][col_name] }}]} \
+1' "{{ lookups_folder }}/{{ lookup_file }}" - > tmp{{ loop.index }}_{{ table_name }}.txt
+{% endif %}
+{% endfor %}
+
+{% if table.lookup_columns|length > 0 %}
+cat tmp{{ table.lookup_columns|length }}_{{ table_name }}.txt >> s03_{{ table_name }}.txt
+rm -f tmp*_{{ table_name }}.txt
+{% endif %}
+
+{% endif %}
+{% endfor %}
+
+echo "Lookup conversion complete" $(date)

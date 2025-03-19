@@ -1,0 +1,104 @@
+#!/bin/bash
+#$ -cwd
+#$ -j y
+#$ -pe smp {{ grid_engine.cpus }}
+#$ -l h_rt={{ grid_engine.runtime }}
+#$ -l h_vmem={{ grid_engine.memory }}
+
+module load use.dev sqlite/3.36.0
+
+# Function to get column count from schema
+get_schema_columns() {
+    local table=$1
+    sqlite3 {{ database_path }} <<EOF
+.headers off
+.mode list
+WITH PRAGMA_TABLE_INFO AS (
+    SELECT * FROM pragma_table_info('$table')
+)
+SELECT COUNT(*) FROM PRAGMA_TABLE_INFO;
+EOF
+}
+
+# Function to get column count from input file
+get_file_columns() {
+    local file=$1
+    head -n1 "$file" | awk -F'\t' '{print NF}'
+}
+
+echo "Creating database and tables" $(date)
+
+rm {{ database_path }}
+
+# Create database and tables
+sqlite3 -batch {{ database_path }} << 'EOF'
+PRAGMA foreign_keys=OFF;
+PRAGMA journal_mode=OFF;
+PRAGMA synchronous=OFF;
+PRAGMA locking_mode=EXCLUSIVE;
+
+BEGIN TRANSACTION;
+{% for statement in create_statements %}
+{{ statement }}
+{% endfor %}
+COMMIT;
+EOF
+
+# Validate each table before loading
+has_errors=0
+echo "Validating column counts..." $(date)
+
+{% for table in tables %}
+input_file="{{ table }}/s04_{{ table }}.txt"
+if [[ ! -f "$input_file" ]]; then
+    echo "ERROR: Input file not found for {{ table }}: $input_file"
+    has_errors=1
+    continue
+fi
+
+schema_cols=$(get_schema_columns "{{ table }}")
+file_cols=$(get_file_columns "$input_file")
+
+if [[ "$schema_cols" != "$file_cols" ]]; then
+    echo "ERROR: Column count mismatch for table {{ table }}"
+    echo "Schema declares $schema_cols columns but input file has $file_cols columns"
+    echo "Please check schema definition and input file: $input_file"
+    has_errors=1
+fi
+{% endfor %}
+
+# Exit if any validation errors were found
+if [[ $has_errors -eq 1 ]]; then
+    echo "Validation errors found. Aborting database creation." $(date)
+    exit 1
+fi
+
+echo "Loading data" $(date)
+
+cd {{ processed_data_folder }}
+
+# Import data for each table
+sqlite3 -batch {{ database_path }} << 'EOF'
+.mode tabs
+{% for table in tables %}
+.import {{ table }}/s04_{{ table }}.txt {{ table }}
+{% endfor %}
+EOF
+
+echo "Creating indexes" $(date)
+
+# Create indexes
+sqlite3 -batch {{ database_path }} << 'EOF'
+PRAGMA synchronous=OFF;
+PRAGMA journal_mode=OFF;
+
+BEGIN TRANSACTION;
+{% for statement in index_statements %}
+{{ statement }}
+{% endfor %}
+COMMIT;
+
+ANALYZE;
+EOF
+
+echo "Database creation complete" $(date)
