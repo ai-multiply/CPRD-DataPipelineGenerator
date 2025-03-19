@@ -1,2 +1,4 @@
 logs/
 generated_scripts/
+__pycache__/
+.ipynb_checkpoints
