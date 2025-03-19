@@ -64,11 +64,12 @@ For each step:
 3. Verify successful completion
 4. Proceed to generating the next step
 
-Editing submit.sh
-The submit.sh script contains a line like this:
+**Editing submit.sh**
+
+the submit.sh script contains a line like this:
 
 ```bash
-python new_run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables
+python run.py -c new.yaml -o $PWD/generated_scripts -s annotate_tables
 ```
 
 For each step, modify the -s parameter to specify the correct step code:
@@ -76,21 +77,21 @@ For each step, modify the -s parameter to specify the correct step code:
 1. For concatenation:
 
 ```bash
-python new_run.py -c new.yaml -o $PWD/generated_scripts -s concatenate
+python run.py -c new.yaml -o $PWD/generated_scripts -s concatenate
 ```
 
 2. For date conversion:
 
 ```bash
-python new_run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates
+python run.py -c new.yaml -o $PWD/generated_scripts -s convert_dates
 ```
 
 And so on for each step in the sequence.
 
 ### Important Rules
 
-1. Never generate multiple steps at once
-2. Never run multiple jobs simultaneously
+1. Never generate multiple steps at once: the pipeline generator needs to check the output of previous runs to identify columns
+2. Never run multiple jobs simultaneously from different steps: same as above
 3. Always verify job completion before generating the next step
 4. Use specific step codes when generating scripts (e.g., `apply_lookups`, not `s03`)
 
@@ -122,7 +123,7 @@ python run.py --list-steps
 
 ### Common issues
 
-* Ensure that the disk space is enough. Each step will duplicate data. If you are happy with the output, you can delete file from previous steps.
+* Ensure that there is enough disk space (at least double the current size). Each step will duplicate data. If you are happy with the output, you can delete the file(s) from previous steps.
 
 
 
