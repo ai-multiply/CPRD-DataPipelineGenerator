@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+from collections import defaultdict
 
 @dataclass
 class TableConfig:
@@ -37,3 +38,15 @@ class TableConfig:
         for col, lookup_file in self.lookup_columns.items():
             if not lookup_file.endswith('.txt'):
                 raise ValueError(f"Invalid lookup file format for {col}: {lookup_file}")
+
+    def get_columns_to_codelists(self) -> Dict[str, List[str]]:
+        """
+        Get a mapping of columns to their associated codelists.
+        
+        Returns:
+            Dictionary mapping column names to lists of codelist names that annotate them
+        """
+        column_to_codelists = defaultdict(list)
+        for codelist_name, column in self.codelist_annotations.items():
+            column_to_codelists[column].append(codelist_name)
+        return dict(column_to_codelists)

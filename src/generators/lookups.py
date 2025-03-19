@@ -17,6 +17,7 @@ class LookupGenerator(BaseGenerator):
             logger=logger or logging.getLogger(__name__)
         )
         self.validator = TableValidator(self.logger)
+        self.table_input_files = {}
 
     def validate_inputs(self, config: Dict[str, Any]):
         """
@@ -112,6 +113,43 @@ class LookupGenerator(BaseGenerator):
                 "\nLookup files must be tab-separated with 2 columns: code\\tdescription"
             )
 
+    def find_latest_input_file(self, table_name: str, processed_data_folder: str) -> str:
+        """
+        Find the most recent input file for a table, checking s02 then s01.
+        Handles environment variable expansion in paths.
+        """
+        expanded_folder = os.path.expandvars(processed_data_folder)
+        
+        # Try s02 first (output from date conversion)
+        s02_path = os.path.join(
+            expanded_folder,
+            table_name,
+            f"s02_{table_name}.txt"
+        )
+        
+        if os.path.exists(s02_path):
+            # Store just the filename part, not the full path
+            self.table_input_files[table_name] = f"s02_{table_name}.txt"
+            return s02_path
+            
+        # If s02 doesn't exist, try s01 (output from concatenation)
+        s01_path = os.path.join(
+            expanded_folder,
+            table_name,
+            f"s01_{table_name}.txt"
+        )
+        
+        if os.path.exists(s01_path):
+            # Store just the filename part, not the full path
+            self.table_input_files[table_name] = f"s01_{table_name}.txt"
+            return s01_path
+            
+        raise FileNotFoundError(
+            f"No input file found for table {table_name}. "
+            f"Checked:\n- {s02_path}\n- {s01_path}\n"
+            f"Note: Processed data folder expands to: {expanded_folder}"
+        )
+
     def get_column_positions(
         self,
         tables: Dict[str, TableConfig],
@@ -119,6 +157,7 @@ class LookupGenerator(BaseGenerator):
     ) -> Dict[str, Dict[str, int]]:
         """
         Get positions of columns needed for lookups.
+        Handles environment variable expansion in paths.
 
         Args:
             tables: Dictionary of table configurations
@@ -137,11 +176,10 @@ class LookupGenerator(BaseGenerator):
                 continue
 
             try:
-                # Find input file from previous step
-                input_file = self.validator.find_input_file(
+                # Find most recent input file
+                input_file = self.find_latest_input_file(
                     table_name,
-                    processed_data_folder,
-                    prefix="s02"
+                    processed_data_folder
                 )
 
                 # Validate columns and get positions
@@ -157,7 +195,7 @@ class LookupGenerator(BaseGenerator):
                 raise InputValidationError(f"Error validating {table_name}: {str(e)}")
 
         return col_positions
-
+        
     def generate(self, config: Dict[str, Any]) -> str:
         """
         Generate lookup application script.
@@ -207,5 +245,6 @@ class LookupGenerator(BaseGenerator):
             lookups_folder=config['lookups_folder'],
             processed_data_folder=config['processed_data_folder'],
             grid_engine=grid_engine,
-            col_positions=col_positions
+            col_positions=col_positions,
+            table_input_files=self.table_input_files
         )

@@ -67,6 +67,7 @@ class ConcatenateGenerator(BaseGenerator):
             FileNotFoundError: If no files are found
         """
         root_folder = raw_data_config['root_folder']
+        pattern = raw_data_config['pattern']
         self.logger.info(f"Searching in root folder: {root_folder}")
         
         # Log the table configuration
@@ -83,7 +84,7 @@ class ConcatenateGenerator(BaseGenerator):
             return [file_path]
 
         # First find all Part folders
-        part_search = os.path.join(root_folder, "Part[0-9]*")
+        part_search = os.path.join(root_folder, pattern)
         self.logger.info(f"Searching for Part folders with pattern: {part_search}")
         
         part_folders = sorted(glob.glob(part_search))
