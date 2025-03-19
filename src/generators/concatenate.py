@@ -53,36 +53,95 @@ class ConcatenateGenerator(BaseGenerator):
 
     def find_input_files(self, table: TableConfig, raw_data_config: Dict[str, str]) -> List[str]:
         """
-        Find all input files for a given table using glob patterns.
+        Find all input files for a given table across all Part folders.
+        Enhanced logging for debugging.
         
         Args:
             table: Table configuration
             raw_data_config: Raw data configuration with root_folder and pattern
-            
+                
         Returns:
             List of file paths matching the pattern
-            
+                
         Raises:
             FileNotFoundError: If no files are found
         """
-        subfolder = table.subfolder_pattern if hasattr(table, 'subfolder_pattern') and table.subfolder_pattern is not None else ''
+        root_folder = raw_data_config['root_folder']
+        self.logger.info(f"Searching in root folder: {root_folder}")
+        
+        # Log the table configuration
+        self.logger.info(f"Processing table: {table.name}")
+        self.logger.info(f"Subfolder pattern: '{getattr(table, 'subfolder_pattern', '')}'")
+        self.logger.info(f"File pattern: {table.file_pattern}")
+        
+        # Check for direct file path
+        if hasattr(table, 'file_path') and table.file_path:
+            file_path = os.path.join(root_folder, table.file_path)
+            self.logger.info(f"Using direct file path: {file_path}")
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+            return [file_path]
 
-        pattern = os.path.join(
-            raw_data_config['root_folder'],
-            raw_data_config['pattern'],
-            subfolder,
-            table.file_pattern
+        # First find all Part folders
+        part_search = os.path.join(root_folder, "Part[0-9]*")
+        self.logger.info(f"Searching for Part folders with pattern: {part_search}")
+        
+        part_folders = sorted(glob.glob(part_search))
+        self.logger.info(f"Found {len(part_folders)} Part folders:")
+        for folder in part_folders:
+            self.logger.info(f"  - {folder}")
+        
+        if not part_folders:
+            raise FileNotFoundError(f"No Part folders found in {root_folder}")
+        
+        all_files = []
+        for part_folder in part_folders:
+            # Construct search path based on whether subfolder is specified
+            if table.subfolder_pattern:
+                search_path = os.path.join(part_folder, table.subfolder_pattern, table.file_pattern)
+            else:
+                search_path = os.path.join(part_folder, table.file_pattern)
+                
+            self.logger.info(f"Searching in {part_folder} with path: {search_path}")
+                
+            # Find matching files in this Part folder
+            files = sorted(glob.glob(search_path))
+            if files:
+                all_files.extend(files)
+                self.logger.info(
+                    f"Found {len(files)} files in {os.path.basename(part_folder)}"
+                    f"{f'/{table.subfolder_pattern}' if table.subfolder_pattern else ''}"
+                )
+                self.logger.debug("Files found:")
+                for file in files:
+                    self.logger.debug(f"  - {file}")
+            else:
+                self.logger.warning(f"No files found in {search_path}")
+        
+        if not all_files:
+            search_pattern = os.path.join(
+                "Part*",
+                table.subfolder_pattern if table.subfolder_pattern else '',
+                table.file_pattern
+            )
+            raise FileNotFoundError(
+                f"No files found for table {table.name} with pattern: {search_pattern}"
+            )
+                
+        self.logger.info(
+            f"Found total of {len(all_files)} files for table {table.name} "
+            f"across {len(part_folders)} part folders"
         )
         
-        files = sorted(glob.glob(pattern, recursive=True))
-        
-        if not files:
-            raise FileNotFoundError(
-                f"No files found for table {table.name} with pattern: {pattern}"
-            )
+        # Log first and last few files to verify ordering
+        self.logger.info("First 3 files:")
+        for file in all_files[:3]:
+            self.logger.info(f"  - {file}")
+        self.logger.info("Last 3 files:")
+        for file in all_files[-3:]:
+            self.logger.info(f"  - {file}")
             
-        self.logger.info(f"Found {len(files)} files for table {table.name}")
-        return files
+        return all_files
 
     def generate(self, config: Dict[str, Any]) -> str:
         """
